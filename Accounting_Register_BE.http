@@ -1,0 +1,6 @@
+@Accounting_Register_BE_HostAddress = http://localhost:5222
+
+GET {{Accounting_Register_BE_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
