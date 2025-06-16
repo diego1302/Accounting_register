@@ -1,6 +1,6 @@
-﻿using Accounting_Register_BE.Areas.Security_Issuer.Model;
-using Accounting_Register_BE.Areas.Users.Model;
-using Accounting_Register_BE.Resources.Model;
+﻿using Accounting_Register_BE.Areas.Config.Resources.Model;
+using Accounting_Register_BE.Areas.Config.Security_Issuer.Model;
+using Accounting_Register_BE.Areas.Config.Users.Model;
 
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +18,7 @@ namespace Accounting_Register_BE.DataBase
 
         public DbSet<Countries> Countries { get; set; }
         public DbSet<SecuritiesIssuer> securities_Issuer { get; set; }
+        public DbSet<CompanyClient> company_clients { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -26,6 +27,20 @@ namespace Accounting_Register_BE.DataBase
             builder.Entity<SecuritiesIssuer>()
             .Property(p => p.Id)
             .ValueGeneratedOnAdd();
+
+            // One client has many users
+            builder.Entity<ApplicationUser>()
+                .HasOne(u => u.CompanyClient)
+                .WithMany(c => c.registered_users)
+                .HasForeignKey(u => u.CompanyClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // One client has many issuers
+            builder.Entity<SecuritiesIssuer>()
+                .HasOne(s => s.CompanyClient)
+                .WithMany(c => c.registered_companies)
+                .HasForeignKey(s => s.CompanyClientId)
+                .OnDelete(DeleteBehavior.Cascade);
 
         }
     }

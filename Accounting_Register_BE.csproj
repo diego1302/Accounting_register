@@ -19,9 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Areas\Admin\" />
     <Folder Include="Areas\Home\Model\" />
-    <Folder Include="Areas\Users\Controller\" />
+    <Folder Include="Areas\Config\Users\Controller\" />
+    <Folder Include="Areas\Accounting_Module\" />
+    <Folder Include="Areas\Register_Module\" />
   </ItemGroup>
 
 </Project>

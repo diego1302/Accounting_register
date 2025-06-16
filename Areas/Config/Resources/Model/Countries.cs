@@ -2,7 +2,7 @@
 
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
-namespace Accounting_Register_BE.Resources.Model
+namespace Accounting_Register_BE.Areas.Config.Resources.Model
 {
     
     public class Countries

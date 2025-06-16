@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-using Accounting_Register_BE.Resources.Model;
+using Accounting_Register_BE.Areas.Config.Resources.Model;
+using Accounting_Register_BE.Areas.Config.Users.Model;
 
-namespace Accounting_Register_BE.Areas.Security_Issuer.Model
+namespace Accounting_Register_BE.Areas.Config.Security_Issuer.Model
 {
     public class SecuritiesIssuer
     {
@@ -25,6 +26,8 @@ namespace Accounting_Register_BE.Areas.Security_Issuer.Model
 
         public Addreses registered_office_address { get; set; }
         public Addreses postal_office_address { get; set; }
+        public int CompanyClientId { get; set; }
+        public CompanyClient CompanyClient { get; set; }
 
 
     }

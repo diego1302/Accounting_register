@@ -1,6 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 
-using Accounting_Register_BE.Resources.Model;
+using Accounting_Register_BE.Areas.Config.Resources.Model;
+using Accounting_Register_BE.Areas.Config.Security_Issuer.Model;
 
 namespace Accounting_Register_BE.Areas.Config.Users.Model
 {
@@ -20,12 +24,11 @@ namespace Accounting_Register_BE.Areas.Config.Users.Model
         public int phone_number { get; set; }
 
         public string email { get; set; }
-        public string webpage {  get; set; }
+        [AllowNull] public string? webpage {  get; set; }
 
         public Addreses registered_office_address { get; set; }
         public Addreses postal_office_address { get; set; }
-        public List<ApplicationUser> registered_users { get; set; }
-
-
+        [AllowNull] public List<ApplicationUser>? registered_users { get; set; } 
+        [AllowNull] public List<SecuritiesIssuer>? registered_companies { get; set; }
     }
 }

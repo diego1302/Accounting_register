@@ -1,4 +1,4 @@
-using Accounting_Register_BE.Areas.Users.Model;
+using Accounting_Register_BE.Areas.Config.Users.Model;
 using Accounting_Register_BE.DataBase;
 
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -21,6 +21,18 @@ builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDBContext>();
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.SignIn.RequireConfirmedEmail = false; // for debugging
+});
+
+
+
+
+
 #endregion
 
 #region Section to add Interfaces 
@@ -34,7 +46,7 @@ builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigin",
-        builder => builder.WithOrigins("http://localhost:4200")
+        builder => builder.WithOrigins(["http://localhost:4200", "http://localhost:5222"])
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowAnyOrigin()
@@ -82,7 +94,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-
 app.MapIdentityApi<ApplicationUser>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -115,5 +126,13 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 //app.MapProgramEndpoints();
+
+app.Use(async (context, next) =>
+{
+    var port = context.Connection.LocalPort;
+    Console.WriteLine($"Running on port: {port}");
+    await next();
+});
+
 
 app.Run();

@@ -22,7 +22,44 @@ namespace Accounting_Register_BE.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Accounting_Register_BE.Areas.Security_Issuer.Model.SecuritiesIssuer", b =>
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Resources.Model.Countries", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+
+                    b.Property<string>("aplha2code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("aplha3code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("full_name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("numericcode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("shortName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("short_name_lower_case")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("id");
+
+                    b.ToTable("Countries");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Security_Issuer.Model.SecuritiesIssuer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -39,6 +76,9 @@ namespace Accounting_Register_BE.Migrations
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CompanyClientId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -64,15 +104,20 @@ namespace Accounting_Register_BE.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyClientId");
+
                     b.ToTable("SecuritiesIssuer");
                 });
 
-            modelBuilder.Entity("Accounting_Register_BE.Areas.Users.Model.ApplicationUser", b =>
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("AccessFailedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CompanyClientId")
                         .HasColumnType("int");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -133,6 +178,8 @@ namespace Accounting_Register_BE.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyClientId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -144,41 +191,48 @@ namespace Accounting_Register_BE.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("Accounting_Register_BE.Resources.Model.Countries", b =>
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", b =>
                 {
-                    b.Property<int>("id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("aplha2code")
+                    b.Property<long>("ABN")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ACN")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("aplha3code")
+                    b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("full_name")
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("numericcode")
+                    b.Property<string>("email")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("shortName")
-                        .IsRequired()
+                    b.Property<int>("phone_country_code")
+                        .HasColumnType("int");
+
+                    b.Property<int>("phone_number")
+                        .HasColumnType("int");
+
+                    b.Property<string>("webpage")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("short_name_lower_case")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.HasKey("Id");
 
-                    b.HasKey("id");
-
-                    b.ToTable("Countries");
+                    b.ToTable("company_clients");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -314,9 +368,15 @@ namespace Accounting_Register_BE.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Accounting_Register_BE.Areas.Security_Issuer.Model.SecuritiesIssuer", b =>
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Security_Issuer.Model.SecuritiesIssuer", b =>
                 {
-                    b.OwnsOne("Accounting_Register_BE.Resources.Model.Addreses", "postal_office_address", b1 =>
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithMany("registered_companies")
+                        .HasForeignKey("CompanyClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.Addreses", "postal_office_address", b1 =>
                         {
                             b1.Property<int>("SecuritiesIssuerId")
                                 .HasColumnType("int");
@@ -354,7 +414,7 @@ namespace Accounting_Register_BE.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("SecuritiesIssuerId");
 
-                            b1.OwnsOne("Accounting_Register_BE.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
                                 {
                                     b2.Property<int>("AddresesSecuritiesIssuerId")
                                         .HasColumnType("int");
@@ -371,7 +431,7 @@ namespace Accounting_Register_BE.Migrations
                                         .HasForeignKey("AddresesSecuritiesIssuerId");
                                 });
 
-                            b1.OwnsOne("Accounting_Register_BE.Resources.Model.AustralianAddress", "australian_address", b2 =>
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.AustralianAddress", "australian_address", b2 =>
                                 {
                                     b2.Property<int>("AddresesSecuritiesIssuerId")
                                         .HasColumnType("int");
@@ -405,7 +465,7 @@ namespace Accounting_Register_BE.Migrations
                                 .IsRequired();
                         });
 
-                    b.OwnsOne("Accounting_Register_BE.Resources.Model.Addreses", "registered_office_address", b1 =>
+                    b.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.Addreses", "registered_office_address", b1 =>
                         {
                             b1.Property<int>("SecuritiesIssuerId")
                                 .HasColumnType("int");
@@ -443,7 +503,7 @@ namespace Accounting_Register_BE.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("SecuritiesIssuerId");
 
-                            b1.OwnsOne("Accounting_Register_BE.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
                                 {
                                     b2.Property<int>("AddresesSecuritiesIssuerId")
                                         .HasColumnType("int");
@@ -460,7 +520,7 @@ namespace Accounting_Register_BE.Migrations
                                         .HasForeignKey("AddresesSecuritiesIssuerId");
                                 });
 
-                            b1.OwnsOne("Accounting_Register_BE.Resources.Model.AustralianAddress", "australian_address", b2 =>
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.AustralianAddress", "australian_address", b2 =>
                                 {
                                     b2.Property<int>("AddresesSecuritiesIssuerId")
                                         .HasColumnType("int");
@@ -485,6 +545,206 @@ namespace Accounting_Register_BE.Migrations
 
                                     b2.WithOwner()
                                         .HasForeignKey("AddresesSecuritiesIssuerId");
+                                });
+
+                            b1.Navigation("OverseasAddress")
+                                .IsRequired();
+
+                            b1.Navigation("australian_address")
+                                .IsRequired();
+                        });
+
+                    b.Navigation("CompanyClient");
+
+                    b.Navigation("postal_office_address")
+                        .IsRequired();
+
+                    b.Navigation("registered_office_address")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", b =>
+                {
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithMany("registered_users")
+                        .HasForeignKey("CompanyClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CompanyClient");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", b =>
+                {
+                    b.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.Addreses", "postal_office_address", b1 =>
+                        {
+                            b1.Property<int>("CompanyClientId")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("country")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_1")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_2")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_3")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<int>("street_name")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("street_number")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("sub_unit_and_or_Level")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.HasKey("CompanyClientId");
+
+                            b1.ToTable("company_clients");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompanyClientId");
+
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
+                                {
+                                    b2.Property<int>("AddresesCompanyClientId")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("overseas_post_code")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.HasKey("AddresesCompanyClientId");
+
+                                    b2.ToTable("company_clients");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("AddresesCompanyClientId");
+                                });
+
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.AustralianAddress", "australian_address", b2 =>
+                                {
+                                    b2.Property<int>("AddresesCompanyClientId")
+                                        .HasColumnType("int");
+
+                                    b2.Property<int>("australia_post_code")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("postal_delivery_street_type")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.Property<int>("state")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("suburb")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.HasKey("AddresesCompanyClientId");
+
+                                    b2.ToTable("company_clients");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("AddresesCompanyClientId");
+                                });
+
+                            b1.Navigation("OverseasAddress")
+                                .IsRequired();
+
+                            b1.Navigation("australian_address")
+                                .IsRequired();
+                        });
+
+                    b.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.Addreses", "registered_office_address", b1 =>
+                        {
+                            b1.Property<int>("CompanyClientId")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("country")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_1")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_2")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("postal_delivery_number_line_3")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<int>("street_name")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("street_number")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("sub_unit_and_or_Level")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.HasKey("CompanyClientId");
+
+                            b1.ToTable("company_clients");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompanyClientId");
+
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.OverseasAddress", "OverseasAddress", b2 =>
+                                {
+                                    b2.Property<int>("AddresesCompanyClientId")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("overseas_post_code")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.HasKey("AddresesCompanyClientId");
+
+                                    b2.ToTable("company_clients");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("AddresesCompanyClientId");
+                                });
+
+                            b1.OwnsOne("Accounting_Register_BE.Areas.Config.Resources.Model.AustralianAddress", "australian_address", b2 =>
+                                {
+                                    b2.Property<int>("AddresesCompanyClientId")
+                                        .HasColumnType("int");
+
+                                    b2.Property<int>("australia_post_code")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("postal_delivery_street_type")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.Property<int>("state")
+                                        .HasColumnType("int");
+
+                                    b2.Property<string>("suburb")
+                                        .IsRequired()
+                                        .HasColumnType("nvarchar(max)");
+
+                                    b2.HasKey("AddresesCompanyClientId");
+
+                                    b2.ToTable("company_clients");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("AddresesCompanyClientId");
                                 });
 
                             b1.Navigation("OverseasAddress")
@@ -512,7 +772,7 @@ namespace Accounting_Register_BE.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("Accounting_Register_BE.Areas.Users.Model.ApplicationUser", null)
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -521,7 +781,7 @@ namespace Accounting_Register_BE.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("Accounting_Register_BE.Areas.Users.Model.ApplicationUser", null)
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -536,7 +796,7 @@ namespace Accounting_Register_BE.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Accounting_Register_BE.Areas.Users.Model.ApplicationUser", null)
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -545,11 +805,18 @@ namespace Accounting_Register_BE.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("Accounting_Register_BE.Areas.Users.Model.ApplicationUser", null)
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", b =>
+                {
+                    b.Navigation("registered_companies");
+
+                    b.Navigation("registered_users");
                 });
 #pragma warning restore 612, 618
         }
