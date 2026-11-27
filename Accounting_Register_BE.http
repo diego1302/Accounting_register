@@ -30,3 +30,53 @@ Authorization: Bearer {{token}}
 ### Countries
 GET {{host}}/api/countries
 Authorization: Bearer {{token}}
+
+### ---------------- Accounting (per company client) ----------------
+@company = 1
+
+### Chart of accounts
+GET {{host}}/api/companies/{{company}}/accounts
+Authorization: Bearer {{token}}
+
+### Load standard Australian chart of accounts
+POST {{host}}/api/companies/{{company}}/accounts/load-default
+Authorization: Bearer {{token}}
+
+### Bank accounts (with statement / ledger balances)
+GET {{host}}/api/companies/{{company}}/bank-accounts
+Authorization: Bearer {{token}}
+
+### Create bank account (creates its ledger account 090, 091…)
+POST {{host}}/api/companies/{{company}}/bank-accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Cuenta corriente CBA", "bankName": "Commonwealth Bank", "bsb": "062-000", "accountNumber": "12345678" }
+
+### Import statement (CSV/OFX/QFX). Optional form field "mapping" = CsvMapping JSON; use /statements/preview first
+POST {{host}}/api/companies/{{company}}/bank-accounts/1/statements
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=b
+
+--b
+Content-Disposition: form-data; name="file"; filename="cba.csv"
+Content-Type: text/csv
+
+27/11/2026,"-110.00","TELSTRA PREPAID","+1890.00"
+26/11/2026,"+2000.00","Transfer from client","+2000.00"
+--b--
+
+### Pending transactions
+GET {{host}}/api/companies/{{company}}/bank-accounts/1/transactions?status=Unreconciled
+Authorization: Bearer {{token}}
+
+### Reconcile (lines are GST-inclusive and must add up to the transaction)
+POST {{host}}/api/companies/{{company}}/bank-transactions/1/reconcile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "lines": [ { "accountId": 25, "amount": 110.00, "taxType": "GST" } ] }
+
+### Undo reconciliation
+DELETE {{host}}/api/companies/{{company}}/bank-transactions/1/reconcile
+Authorization: Bearer {{token}}

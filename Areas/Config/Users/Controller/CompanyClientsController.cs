@@ -82,6 +82,8 @@ namespace Accounting_Register_BE.Areas.Config.Users.Controller
         {
             var entity = await _db.CompanyClients.FirstOrDefaultAsync(x => x.Id == id);
             if (entity is null) return NotFound();
+            if (await _db.Accounts.AnyAsync(a => a.CompanyClientId == id) || await _db.JournalEntries.AnyAsync(j => j.CompanyClientId == id))
+                return Problem("La empresa tiene contabilidad (plan de cuentas, bancos o asientos) y no se puede eliminar.", statusCode: 409);
             _db.CompanyClients.Remove(entity);
             await _db.SaveChangesAsync();
             return NoContent();

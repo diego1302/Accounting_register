@@ -19,6 +19,8 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 - `DataBase/ApplicationDBContext.cs` — `IdentityDbContext<ApplicationUser>`; mapeo de direcciones.
 - `Areas/Config/Security_Issuer/` — modelo y controlador de emisores.
 - `Areas/Config/Users/` — `ApplicationUser`, `CompanyClient`, controladores de clientes y perfil.
+- `Areas/Accounting/` — contabilidad por empresa cliente: `Model/` (entidades + DTOs), `Services/` (`StatementParser` CSV/OFX,
+  `AccountingService` asientos y GST, `DefaultChartOfAccounts`), `Controller/` (cuentas, bancos/extractos, conciliación).
 - `Resources/` — modelos compartidos (`Addreses`, `Countries`, `PaginationModel`, `PagedResult`) y `CountriesController`.
 - `Migrations/` — migraciones EF (no editar a mano las ya aplicadas).
 
@@ -30,6 +32,9 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 | `/api/securities-issuers` | CRUD; GET lista acepta `q`, `page`, `limit` y devuelve `{ items, pagination }`. |
 | `/api/company-clients` | Igual que emisores. |
 | `/api/countries` | CRUD; GET devuelve array, filtro `q`. |
+| `/api/companies/{companyId}/accounts` | Plan de cuentas (CRUD, `?includeArchived`), `POST load-default` carga el plan australiano estándar. |
+| `/api/companies/{companyId}/bank-accounts` | CRUD (crea su cuenta contable tipo `Bank`, código 090…); `POST {id}/statements/preview` y `POST {id}/statements` (multipart `file` + `mapping` JSON opcional); `GET/DELETE {id}/statements`; `GET {id}/transactions?status&q&page&limit`. |
+| `/api/companies/{companyId}/bank-transactions/{id}/reconcile` | `POST` contabiliza (genera asiento), `DELETE` deshace. |
 Todos excepto `/api/auth/*` llevan `[Authorize]`.
 
 ## Convenciones y trampas
@@ -42,4 +47,9 @@ Todos excepto `/api/auth/*` llevan `[Authorize]`.
 - El JSON sale en camelCase: `Name` → `name`, `ABN` → `abn`, `OverseasAddress` → `overseasAddress`; propiedades snake_case quedan igual.
 - Hay dos `DbSet<SecuritiesIssuer>` (`SecurtiesIssuer` con typo y `securities_Issuer`); usar `SecurtiesIssuer`. No renombrar sin migración.
 - Nombres de propiedades mezclan estilos (`aplha2code` con typo, snake_case); el frontend depende de ellos, cambiar en ambos lados.
+- **Contabilidad**: todo cuelga de `CompanyClientId`. Montos de `BankTransaction`: > 0 entra, < 0 sale. Conciliar crea un
+  `JournalEntry` de partida doble; las líneas de conciliación son montos brutos y con `TaxType.GST` se separa 1/11 a la cuenta
+  con `SystemKey = "GST"` (se crea sola si falta). Duplicados de extractos: índice único `(BankAccountId, DedupeKey)`.
+  Todas las FK de contabilidad son `Restrict` (SQL Server no admite rutas de cascada múltiples): los borrados se hacen
+  explícitos en los controladores, y una empresa con contabilidad no se puede eliminar.
 - Los controladores se ubican por atributo `[Route("api/...")]`, no por convención de Areas.
