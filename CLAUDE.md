@@ -35,6 +35,7 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 | `/api/companies/{companyId}/accounts` | Plan de cuentas (CRUD, `?includeArchived`), `POST load-default` carga el plan australiano estándar. |
 | `/api/companies/{companyId}/bank-accounts` | CRUD (crea su cuenta contable tipo `Bank`, código 090…); `POST {id}/statements/preview` y `POST {id}/statements` (multipart `file` + `mapping` JSON opcional); `GET/DELETE {id}/statements`; `GET {id}/transactions?status&q&page&limit`. |
 | `/api/companies/{companyId}/bank-transactions/{id}/reconcile` | `POST` contabiliza (genera asiento), `DELETE` deshace. |
+| `/api/companies/{companyId}/reports/*` | `profit-and-loss?from&to`, `balance-sheet?asOf`, `trial-balance?asOf`, `general-ledger?from&to&accountId`. Montos con el signo natural de cada cuenta; año fiscal australiano (1 jul). Sin cierre de ejercicio: el balance muestra "Resultado del ejercicio" y "de ejercicios anteriores" calculados. |
 Todos excepto `/api/auth/*` llevan `[Authorize]`.
 
 ## Convenciones y trampas

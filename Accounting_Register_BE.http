@@ -80,3 +80,19 @@ Content-Type: application/json
 ### Undo reconciliation
 DELETE {{host}}/api/companies/{{company}}/bank-transactions/1/reconcile
 Authorization: Bearer {{token}}
+
+### ---------------- Reports (dates yyyy-MM-dd; Australian financial year starts 1 July) ----------------
+GET {{host}}/api/companies/{{company}}/reports/profit-and-loss?from=2026-07-01&to=2027-06-30
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/companies/{{company}}/reports/balance-sheet?asOf=2026-11-30
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/companies/{{company}}/reports/trial-balance?asOf=2026-11-30
+Authorization: Bearer {{token}}
+
+### accountId optional (all accounts with activity)
+GET {{host}}/api/companies/{{company}}/reports/general-ledger?from=2026-11-01&to=2026-11-30&accountId=25
+Authorization: Bearer {{token}}
