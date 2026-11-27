@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REPO_DIR: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\tech\Accounting_register
+  REPO_DIR: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\tech\DCCOL_Accounting_BE
   COMPOSE_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\docker\docker-compose.yml
   ENV_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\docker\.env
   DOCKER: C:\Program Files\Docker\Docker\resources\bin\docker.exe

@@ -2,7 +2,7 @@
 
 API en ASP.NET Core 8 + EF Core (SQL Server) para un registro de **emisores de valores** (securities issuers)
 y **empresas cliente**, con datos australianos (ABN, ACN, estados, códigos postales).
-El frontend Angular vive en otro repo: `diego1302/Accounting_Register_FE`.
+El frontend Angular vive en otro repo: `diego1302/DCCOL_Accounting_FE`.
 
 ## Comandos
 ```bash
