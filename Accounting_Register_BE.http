@@ -1,6 +1,32 @@
-@Accounting_Register_BE_HostAddress = http://localhost:5222
+@host = http://localhost:5222
 
-GET {{Accounting_Register_BE_HostAddress}}/weatherforecast/
-Accept: application/json
+### Register
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "email": "user@example.com", "password": "Passw0rd!" }
+
+### Login (copy accessToken into @token)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "user@example.com", "password": "Passw0rd!" }
 
 ###
+@token = paste-access-token-here
+
+### Profile
+GET {{host}}/api/profile
+Authorization: Bearer {{token}}
+
+### Securities issuers
+GET {{host}}/api/securities-issuers?page=1&limit=25
+Authorization: Bearer {{token}}
+
+### Company clients
+GET {{host}}/api/company-clients
+Authorization: Bearer {{token}}
+
+### Countries
+GET {{host}}/api/countries
+Authorization: Bearer {{token}}

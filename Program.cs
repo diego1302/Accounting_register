@@ -1,7 +1,6 @@
 using Accounting_Register_BE.Areas.Users.Model;
 using Accounting_Register_BE.DataBase;
 
-using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -37,8 +36,6 @@ builder.Services.AddCors(options =>
         builder => builder.WithOrigins("http://localhost:4200")
                           .AllowAnyHeader()
                           .AllowAnyMethod()
-                          .AllowAnyOrigin()
-                          //.AllowCredentials()
                           );
 });
 
@@ -47,7 +44,8 @@ builder.Services.AddCors(options =>
 
 #region Controllers Endpoints
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options => {
@@ -83,7 +81,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 
-app.MapIdentityApi<ApplicationUser>();
+// Identity endpoints: /api/auth/register, /api/auth/login, /api/auth/refresh, /api/auth/manage/info ...
+app.MapGroup("/api/auth").MapIdentityApi<ApplicationUser>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors("AllowSpecificOrigin");
