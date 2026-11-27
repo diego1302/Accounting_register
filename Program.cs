@@ -81,8 +81,21 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 
-// Identity endpoints: /api/auth/register, /api/auth/login, /api/auth/refresh, /api/auth/manage/info ...
-app.MapGroup("/api/auth").MapIdentityApi<ApplicationUser>();
+// Identity endpoints: /api/auth/login, /api/auth/refresh, /api/auth/manage/info ...
+// Public sign-up (/api/auth/register) is off unless Auth:AllowRegistration is true
+// (on in Development; in Docker it is set with ACCOUNTING_ALLOW_REGISTRATION in .env).
+var allowRegistration = app.Configuration.GetValue<bool>("Auth:AllowRegistration");
+var authGroup = app.MapGroup("/api/auth");
+authGroup.AddEndpointFilter(async (context, next) =>
+{
+    var path = context.HttpContext.Request.Path.Value ?? string.Empty;
+    if (!allowRegistration && path.EndsWith("/register", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.NotFound();
+    }
+    return await next(context);
+});
+authGroup.MapIdentityApi<ApplicationUser>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors("AllowSpecificOrigin");
