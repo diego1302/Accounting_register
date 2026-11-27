@@ -14,8 +14,8 @@ concurrency:
 
 env:
   REPO_DIR: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\tech\Accounting_register
-  COMPOSE_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Docker\docker-compose.yml
-  ENV_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Docker\.env
+  COMPOSE_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\docker\docker-compose.yml
+  ENV_FILE: C:\Users\dical\Documents\DCSOLUTIONS\Accounting\docker\.env
   DOCKER: C:\Program Files\Docker\Docker\resources\bin\docker.exe
   # Este proyecto usa EF 9: dotnet-ef 9 va en su propia carpeta para no tocar el dotnet-ef 8 global del Print Farm.
   EF_TOOL_PATH: C:\Users\dical\.dotnet\tools-ef9
