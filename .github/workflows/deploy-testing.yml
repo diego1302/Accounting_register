@@ -1,0 +1,82 @@
+name: Deploy testing (accounting backend)
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-testing-accounting-backend
+  cancel-in-progress: false
+
+env:
+  REPO_DIR: C:\Users\dical\Documents\DCSOLUTIONS\TestingEnvironment\src\DCCOL_Accounting_BE
+  COMPOSE_FILE: C:\Users\dical\Documents\DCSOLUTIONS\TestingEnvironment\docker-compose.yml
+  ENV_FILE: C:\Users\dical\Documents\DCSOLUTIONS\TestingEnvironment\.env
+  DOCKER: C:\Program Files\Docker\Docker\resources\bin\docker.exe
+  # Este proyecto usa EF 9: dotnet-ef 9 va en su propia carpeta para no tocar el dotnet-ef 8 global del Print Farm.
+  EF_TOOL_PATH: C:\Users\dical\.dotnet\tools-ef9
+  EF_VERSION: 9.0.6
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, dccol-local]
+    timeout-minutes: 30
+    steps:
+      # El servicio del runner no tiene la carpeta de Docker en el PATH (hace falta para docker-credential-desktop).
+      - name: Preparar PATH de Docker
+        shell: powershell
+        run: Split-Path "$env:DOCKER" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Asegurar dotnet-ef 9
+        shell: powershell
+        run: |
+          $ef = Join-Path $env:EF_TOOL_PATH 'dotnet-ef.exe'
+          if (-not (Test-Path $ef)) {
+            dotnet tool install dotnet-ef --version $env:EF_VERSION --tool-path "$env:EF_TOOL_PATH"
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar dotnet-ef $env:EF_VERSION" }
+          }
+
+      # REPO_DIR es un git worktree en la rama dev (separado de la carpeta de produccion).
+      - name: Actualizar codigo local (dev)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ github.token }}"))
+          git -C "$env:REPO_DIR" -c "http.extraheader=AUTHORIZATION: basic $auth" pull --ff-only origin dev
+          if ($LASTEXITCODE -ne 0) { throw "git pull fallo (hay cambios locales sin commitear?)" }
+          git -C "$env:REPO_DIR" log -1 --format='Desplegando en testing %h - %s'
+
+      - name: Comprobar que modelo y migraciones cuadran
+        shell: powershell
+        working-directory: ${{ env.REPO_DIR }}
+        run: |
+          $env:ASPNETCORE_ENVIRONMENT = 'Production'
+          & (Join-Path $env:EF_TOOL_PATH 'dotnet-ef.exe') migrations has-pending-model-changes --project Accounting_Register_BE.csproj
+          if ($LASTEXITCODE -ne 0) { throw "El modelo tiene cambios sin migracion: genera la migracion antes de desplegar." }
+
+      # Si una migracion falla, el job se detiene y NO se despliega el backend nuevo.
+      - name: Aplicar migraciones a la base de datos UAT
+        shell: powershell
+        working-directory: ${{ env.REPO_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $line = Get-Content "$env:ENV_FILE" | Where-Object { $_ -match '^\s*ACCOUNTING_UAT_CONNECTION_STRING\s*=' } | Select-Object -First 1
+          if (-not $line) { throw "ACCOUNTING_UAT_CONNECTION_STRING no esta en $env:ENV_FILE" }
+          $cs = ($line -split '=', 2)[1].Trim().Trim('"').Trim("'")
+          $cs = $cs -replace '(?i)host\.docker\.internal', 'localhost'
+          Write-Output "::add-mask::$cs"
+          $env:ASPNETCORE_ENVIRONMENT = 'Production'
+          $env:ConnectionStrings__DefaultConnection = $cs
+          & (Join-Path $env:EF_TOOL_PATH 'dotnet-ef.exe') database update --project Accounting_Register_BE.csproj --no-build
+          if ($LASTEXITCODE -ne 0) { throw "dotnet ef database update fallo" }
+
+      - name: Reconstruir y reiniciar contenedor de testing
+        shell: powershell
+        run: |
+          & "$env:DOCKER" compose -f "$env:COMPOSE_FILE" up -d --build accounting_backend
+          if ($LASTEXITCODE -ne 0) { throw "docker compose fallo" }
+          & "$env:DOCKER" image prune -f
