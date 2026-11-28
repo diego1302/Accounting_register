@@ -19,6 +19,8 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 - `DataBase/ApplicationDBContext.cs` — `IdentityDbContext<ApplicationUser>`; mapeo de direcciones.
 - `Areas/Config/Security_Issuer/` — modelo y controlador de emisores.
 - `Areas/Config/Users/` — `ApplicationUser`, `CompanyClient`, controladores de clientes y perfil.
+- `Areas/Accounting/` — contabilidad por empresa cliente: `Model/` (entidades + DTOs), `Services/` (`StatementParser` CSV/OFX,
+  `AccountingService` asientos y GST, `DefaultChartOfAccounts`), `Controller/` (cuentas, bancos/extractos, conciliación, asientos, reportes, API keys), `Security/` (esquema `ApiKey`).
 - `Resources/` — modelos compartidos (`Addreses`, `Countries`, `PaginationModel`, `PagedResult`) y `CountriesController`.
 - `Migrations/` — migraciones EF (no editar a mano las ya aplicadas).
 
@@ -30,7 +32,15 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 | `/api/securities-issuers` | CRUD; GET lista acepta `q`, `page`, `limit` y devuelve `{ items, pagination }`. |
 | `/api/company-clients` | Igual que emisores. |
 | `/api/countries` | CRUD; GET devuelve array, filtro `q`. |
-Todos excepto `/api/auth/*` llevan `[Authorize]`.
+| `/api/companies/{companyId}/accounts` | Plan de cuentas (CRUD, `?includeArchived`), `POST load-default` carga el plan australiano estándar. |
+| `/api/companies/{companyId}/bank-accounts` | CRUD (crea su cuenta contable tipo `Bank`, código 090…); `POST {id}/statements/preview` y `POST {id}/statements` (multipart `file` + `mapping` JSON opcional); `GET/DELETE {id}/statements`; `GET {id}/transactions?status&q&page&limit`. |
+| `/api/companies/{companyId}/bank-transactions/{id}/reconcile` | `POST` contabiliza (genera asiento), `DELETE` deshace. |
+| `/api/companies/{companyId}/reports/*` | `profit-and-loss?from&to`, `balance-sheet?asOf`, `trial-balance?asOf`, `general-ledger?from&to&accountId`. Montos con el signo natural de cada cuenta; año fiscal australiano (1 jul). Sin cierre de ejercicio: el balance muestra "Resultado del ejercicio" y "de ejercicios anteriores" calculados. |
+| `/api/companies/{companyId}/journal-entries` | Asientos: GET lista/detalle, `POST` (uno), `POST batch` (≤100, todo o nada), `DELETE` (no los de banco). Acepta token de usuario **o** header `X-Api-Key` (app externa). Idempotente con `externalSource`+`externalId`. Doc para terceros: `docs/journal-api.md`. |
+| `/api/companies/{companyId}/api-keys` | Claves de apps externas (solo usuarios): GET, `POST {name}` devuelve la clave una sola vez, `DELETE` revoca. |
+Todos excepto `/api/auth/*` llevan `[Authorize]`. Las API keys solo autentican en `/journal-entries` (política `JournalApi`);
+el resto usa la política por defecto (solo usuarios). Una clave está atada a una empresa: el controlador compara su claim
+`company_id` con la ruta.
 
 ## Convenciones y trampas
 - `Nullable` está activado: un `string` no anulable se vuelve **obligatorio** en el model binding y `NOT NULL` en BD.
@@ -42,4 +52,9 @@ Todos excepto `/api/auth/*` llevan `[Authorize]`.
 - El JSON sale en camelCase: `Name` → `name`, `ABN` → `abn`, `OverseasAddress` → `overseasAddress`; propiedades snake_case quedan igual.
 - Hay dos `DbSet<SecuritiesIssuer>` (`SecurtiesIssuer` con typo y `securities_Issuer`); usar `SecurtiesIssuer`. No renombrar sin migración.
 - Nombres de propiedades mezclan estilos (`aplha2code` con typo, snake_case); el frontend depende de ellos, cambiar en ambos lados.
+- **Contabilidad**: todo cuelga de `CompanyClientId`. Montos de `BankTransaction`: > 0 entra, < 0 sale. Conciliar crea un
+  `JournalEntry` de partida doble; las líneas de conciliación son montos brutos y con `TaxType.GST` se separa 1/11 a la cuenta
+  con `SystemKey = "GST"` (se crea sola si falta). Duplicados de extractos: índice único `(BankAccountId, DedupeKey)`.
+  Todas las FK de contabilidad son `Restrict` (SQL Server no admite rutas de cascada múltiples): los borrados se hacen
+  explícitos en los controladores, y una empresa con contabilidad no se puede eliminar.
 - Los controladores se ubican por atributo `[Route("api/...")]`, no por convención de Areas.

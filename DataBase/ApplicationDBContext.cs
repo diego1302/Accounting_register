@@ -1,4 +1,5 @@
-﻿using Accounting_Register_BE.Areas.Config.Users.Model;
+﻿using Accounting_Register_BE.Areas.Accounting.Model;
+using Accounting_Register_BE.Areas.Config.Users.Model;
 using Accounting_Register_BE.Areas.Security_Issuer.Model;
 using Accounting_Register_BE.Areas.Users.Model;
 using Accounting_Register_BE.Resources.Model;
@@ -25,6 +26,15 @@ namespace Accounting_Register_BE.DataBase
         public DbSet<Countries> Countries { get; set; }
         public DbSet<SecuritiesIssuer> securities_Issuer { get; set; }
 
+        // Accounting (per company client)
+        public DbSet<Account> Accounts { get; set; }
+        public DbSet<BankAccount> BankAccounts { get; set; }
+        public DbSet<BankStatement> BankStatements { get; set; }
+        public DbSet<BankTransaction> BankTransactions { get; set; }
+        public DbSet<JournalEntry> JournalEntries { get; set; }
+        public DbSet<JournalLine> JournalLines { get; set; }
+        public DbSet<ApiKey> ApiKeys { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);            
@@ -43,6 +53,69 @@ namespace Accounting_Register_BE.DataBase
             ConfigureAddress(builder.Entity<SecuritiesIssuer>(), x => x.postal_office_address);
             ConfigureAddress(builder.Entity<CompanyClient>(), x => x.registered_office_address);
             ConfigureAddress(builder.Entity<CompanyClient>(), x => x.postal_office_address);
+
+            ConfigureAccounting(builder);
+        }
+
+        // Every company-level FK is Restrict: SQL Server rejects multiple cascade paths, and a company's books
+        // should never disappear by accident. Child rows are deleted explicitly by the controllers.
+        private static void ConfigureAccounting(ModelBuilder builder)
+        {
+            builder.Entity<Account>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.CompanyClientId, x.Code }).IsUnique();
+                e.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+                e.Property(x => x.TaxType).HasConversion<string>().HasMaxLength(20);
+            });
+
+            builder.Entity<BankAccount>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.AccountId).IsUnique();
+            });
+
+            builder.Entity<BankStatement>(e =>
+            {
+                e.HasOne(x => x.BankAccount).WithMany().HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<BankTransaction>(e =>
+            {
+                e.HasOne(x => x.BankAccount).WithMany().HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.BankStatement).WithMany().HasForeignKey(x => x.BankStatementId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.JournalEntry).WithMany().HasForeignKey(x => x.JournalEntryId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.BankAccountId, x.DedupeKey }).IsUnique();
+                e.HasIndex(x => new { x.BankAccountId, x.Status, x.Date });
+                e.Property(x => x.Amount).HasPrecision(18, 2);
+                e.Property(x => x.Balance).HasPrecision(18, 2);
+                e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            });
+
+            builder.Entity<JournalEntry>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.CompanyClientId, x.Date });
+                e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+                // Idempotency for external apps: the same (source, id) can only be posted once per company.
+                e.HasIndex(x => new { x.CompanyClientId, x.ExternalSource, x.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
+            });
+
+            builder.Entity<ApiKey>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.KeyHash).IsUnique();
+            });
+
+            builder.Entity<JournalLine>(e =>
+            {
+                e.HasOne(x => x.JournalEntry).WithMany(x => x.Lines).HasForeignKey(x => x.JournalEntryId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.Debit).HasPrecision(18, 2);
+                e.Property(x => x.Credit).HasPrecision(18, 2);
+                e.Property(x => x.TaxType).HasConversion<string>().HasMaxLength(20);
+            });
         }
 
         private static void ConfigureAddress<T>(EntityTypeBuilder<T> entity, Expression<Func<T, Addreses?>> navigation) where T : class

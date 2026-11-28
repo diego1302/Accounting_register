@@ -30,3 +30,94 @@ Authorization: Bearer {{token}}
 ### Countries
 GET {{host}}/api/countries
 Authorization: Bearer {{token}}
+
+### ---------------- Accounting (per company client) ----------------
+@company = 1
+
+### Chart of accounts
+GET {{host}}/api/companies/{{company}}/accounts
+Authorization: Bearer {{token}}
+
+### Load standard Australian chart of accounts
+POST {{host}}/api/companies/{{company}}/accounts/load-default
+Authorization: Bearer {{token}}
+
+### Bank accounts (with statement / ledger balances)
+GET {{host}}/api/companies/{{company}}/bank-accounts
+Authorization: Bearer {{token}}
+
+### Create bank account (creates its ledger account 090, 091…)
+POST {{host}}/api/companies/{{company}}/bank-accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Cuenta corriente CBA", "bankName": "Commonwealth Bank", "bsb": "062-000", "accountNumber": "12345678" }
+
+### Import statement (CSV/OFX/QFX). Optional form field "mapping" = CsvMapping JSON; use /statements/preview first
+POST {{host}}/api/companies/{{company}}/bank-accounts/1/statements
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=b
+
+--b
+Content-Disposition: form-data; name="file"; filename="cba.csv"
+Content-Type: text/csv
+
+27/11/2026,"-110.00","TELSTRA PREPAID","+1890.00"
+26/11/2026,"+2000.00","Transfer from client","+2000.00"
+--b--
+
+### Pending transactions
+GET {{host}}/api/companies/{{company}}/bank-accounts/1/transactions?status=Unreconciled
+Authorization: Bearer {{token}}
+
+### Reconcile (lines are GST-inclusive and must add up to the transaction)
+POST {{host}}/api/companies/{{company}}/bank-transactions/1/reconcile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "lines": [ { "accountId": 25, "amount": 110.00, "taxType": "GST" } ] }
+
+### Undo reconciliation
+DELETE {{host}}/api/companies/{{company}}/bank-transactions/1/reconcile
+Authorization: Bearer {{token}}
+
+### ---------------- Reports (dates yyyy-MM-dd; Australian financial year starts 1 July) ----------------
+GET {{host}}/api/companies/{{company}}/reports/profit-and-loss?from=2026-07-01&to=2027-06-30
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/companies/{{company}}/reports/balance-sheet?asOf=2026-11-30
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/companies/{{company}}/reports/trial-balance?asOf=2026-11-30
+Authorization: Bearer {{token}}
+
+### accountId optional (all accounts with activity)
+GET {{host}}/api/companies/{{company}}/reports/general-ledger?from=2026-11-01&to=2026-11-30&accountId=25
+Authorization: Bearer {{token}}
+
+### ---------------- External journal API (X-Api-Key; create the key in the app: Configuración → Integraciones) ----------------
+@apikey = ar_paste-key-here
+
+POST {{host}}/api/companies/{{company}}/journal-entries
+X-Api-Key: {{apikey}}
+Content-Type: application/json
+
+{ "date": "2026-11-27", "reference": "Z-1001", "narration": "Ventas POS del día", "externalId": "z-1001",
+  "lines": [ { "accountCode": "610", "debit": 1100 }, { "accountCode": "200", "credit": 1000 }, { "accountCode": "820", "credit": 100 } ] }
+
+### Batch (all or nothing)
+POST {{host}}/api/companies/{{company}}/journal-entries/batch
+X-Api-Key: {{apikey}}
+Content-Type: application/json
+
+{ "entries": [ { "date": "2026-11-28", "narration": "Ventas POS 28/11", "externalId": "z-1002",
+  "lines": [ { "accountCode": "610", "debit": 550 }, { "accountCode": "200", "credit": 500 }, { "accountCode": "820", "credit": 50 } ] } ] }
+
+### API keys (user token)
+POST {{host}}/api/companies/{{company}}/api-keys
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "POS tienda" }
