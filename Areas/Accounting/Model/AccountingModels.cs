@@ -41,7 +41,13 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         Manual,
         /// <summary>Posted by an external application through the API (API key).</summary>
         External,
+        /// <summary>Financial year closing: moves the year's profit/loss to retained earnings. Excluded from the P&amp;L.</summary>
+        Closing,
     }
+
+    public enum RuleMatchField { Description, Reference }
+    public enum RuleMatchType { Contains, StartsWith, Equals }
+    public enum RuleDirection { Any, MoneyIn, MoneyOut }
 
     /// <summary>Chart of accounts entry. Each company client has its own chart.</summary>
     public class Account
@@ -136,6 +142,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         public JournalSource Source { get; set; }
         public DateTime CreatedAt { get; set; }
         [MaxLength(450)] public string? CreatedByUserId { get; set; }
+        /// <summary>Who posted it, for display: the user's email, "API: key name" or "Regla: name".</summary>
+        [MaxLength(256)] public string? CreatedBy { get; set; }
 
         /// <summary>System that sent the entry (e.g. "pos", "payroll"). With <see cref="ExternalId"/> it makes posting idempotent.</summary>
         [MaxLength(50)] public string? ExternalSource { get; set; }
@@ -181,5 +189,82 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         [JsonIgnore, MaxLength(450)] public string? CreatedByUserId { get; set; }
         public DateTime? LastUsedAt { get; set; }
         public DateTime? RevokedAt { get; set; }
+    }
+
+    /// <summary>Who did what and when. Written in the same SaveChanges as the change it describes.</summary>
+    public class AuditLog
+    {
+        [Key] public long Id { get; set; }
+        public int? CompanyClientId { get; set; }
+        [JsonIgnore] public CompanyClient? CompanyClient { get; set; }
+
+        public DateTime At { get; set; }
+        [MaxLength(450)] public string? UserId { get; set; }
+        public int? ApiKeyId { get; set; }
+        /// <summary>Display name of the actor: email, "API: key name" or "Sistema".</summary>
+        [Required, MaxLength(256)] public string Actor { get; set; } = string.Empty;
+        /// <summary>e.g. JournalCreated, JournalDeleted, Reconciled, Unreconciled, PeriodLocked, YearClosed…</summary>
+        [Required, MaxLength(50)] public string Action { get; set; } = string.Empty;
+        [Required, MaxLength(50)] public string EntityType { get; set; } = string.Empty;
+        [MaxLength(50)] public string? EntityId { get; set; }
+        [Required, MaxLength(500)] public string Summary { get; set; } = string.Empty;
+        /// <summary>Optional JSON snapshot (e.g. the lines of a deleted journal).</summary>
+        public string? Details { get; set; }
+    }
+
+    /// <summary>Per-company accounting settings. One row per company (created on first use).</summary>
+    public class CompanyAccountingSettings
+    {
+        [Key] public int CompanyClientId { get; set; }
+        [JsonIgnore] public CompanyClient? CompanyClient { get; set; }
+        /// <summary>Nothing dated on or before this date can be posted, changed, reconciled or undone.</summary>
+        public DateOnly? LockDate { get; set; }
+    }
+
+    /// <summary>"If the description contains TELSTRA → 489 with GST". Optionally reconciles by itself on import.</summary>
+    public class BankRule
+    {
+        [Key] public int Id { get; set; }
+        public int CompanyClientId { get; set; }
+        [JsonIgnore] public CompanyClient? CompanyClient { get; set; }
+        /// <summary>Null = applies to every bank account of the company.</summary>
+        public int? BankAccountId { get; set; }
+        [JsonIgnore] public BankAccount? BankAccount { get; set; }
+
+        [Required, MaxLength(100)] public string Name { get; set; } = string.Empty;
+        /// <summary>Lower runs first.</summary>
+        public int Priority { get; set; }
+        public RuleMatchField MatchField { get; set; }
+        public RuleMatchType MatchType { get; set; }
+        [Required, MaxLength(200)] public string MatchText { get; set; } = string.Empty;
+        public RuleDirection Direction { get; set; }
+        public decimal? AmountMin { get; set; }
+        public decimal? AmountMax { get; set; }
+
+        public int AccountId { get; set; }
+        [JsonIgnore] public Account? Account { get; set; }
+        public TaxType TaxType { get; set; }
+        [MaxLength(500)] public string? LineDescription { get; set; }
+        /// <summary>Reconcile matching lines automatically when a statement is imported.</summary>
+        public bool AutoReconcile { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public bool Matches(BankTransaction t)
+        {
+            if (!IsActive) return false;
+            if (Direction == RuleDirection.MoneyIn && t.Amount <= 0) return false;
+            if (Direction == RuleDirection.MoneyOut && t.Amount >= 0) return false;
+            var abs = Math.Abs(t.Amount);
+            if (AmountMin != null && abs < AmountMin) return false;
+            if (AmountMax != null && abs > AmountMax) return false;
+            var field = (MatchField == RuleMatchField.Reference ? t.Reference : t.Description) ?? string.Empty;
+            var text = MatchText.Trim();
+            return MatchType switch
+            {
+                RuleMatchType.Equals => string.Equals(field.Trim(), text, StringComparison.OrdinalIgnoreCase),
+                RuleMatchType.StartsWith => field.TrimStart().StartsWith(text, StringComparison.OrdinalIgnoreCase),
+                _ => field.Contains(text, StringComparison.OrdinalIgnoreCase),
+            };
+        }
     }
 }

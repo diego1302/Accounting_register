@@ -34,6 +34,9 @@ namespace Accounting_Register_BE.DataBase
         public DbSet<JournalEntry> JournalEntries { get; set; }
         public DbSet<JournalLine> JournalLines { get; set; }
         public DbSet<ApiKey> ApiKeys { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<CompanyAccountingSettings> AccountingSettings { get; set; }
+        public DbSet<BankRule> BankRules { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -100,6 +103,31 @@ namespace Accounting_Register_BE.DataBase
                 e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
                 // Idempotency for external apps: the same (source, id) can only be posted once per company.
                 e.HasIndex(x => new { x.CompanyClientId, x.ExternalSource, x.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
+            });
+
+            builder.Entity<AuditLog>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.CompanyClientId, x.At });
+                e.HasIndex(x => new { x.CompanyClientId, x.EntityType, x.EntityId });
+            });
+
+            builder.Entity<CompanyAccountingSettings>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithOne().HasForeignKey<CompanyAccountingSettings>(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<BankRule>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.BankAccount).WithMany().HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.MatchField).HasConversion<string>().HasMaxLength(20);
+                e.Property(x => x.MatchType).HasConversion<string>().HasMaxLength(20);
+                e.Property(x => x.Direction).HasConversion<string>().HasMaxLength(20);
+                e.Property(x => x.TaxType).HasConversion<string>().HasMaxLength(20);
+                e.Property(x => x.AmountMin).HasPrecision(18, 2);
+                e.Property(x => x.AmountMax).HasPrecision(18, 2);
             });
 
             builder.Entity<ApiKey>(e =>

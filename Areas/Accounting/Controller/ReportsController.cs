@@ -54,7 +54,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             var start = from ?? FinancialYearStart(end);
             if (start > end) return Problem("La fecha inicial es posterior a la final.", statusCode: 400);
 
-            var balances = await Balances(companyId, start, end);
+            // The year-end closing entry zeroes income/expense accounts; the P&L must show the year's activity.
+            var balances = await Balances(companyId, start, end, excludeClosing: true);
             ReportSection Section(string key, string title, params AccountType[] types)
             {
                 var lines = balances.Where(b => types.Contains(b.Account.Type))
@@ -178,11 +179,12 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
         private record AccountBalance(Account Account, decimal Debit, decimal Credit);
 
         /// <summary>Debit/credit totals per account for journals dated in [from, to] (from = null: since the beginning).</summary>
-        private async Task<List<AccountBalance>> Balances(int companyId, DateOnly? from, DateOnly to, int? accountId = null)
+        private async Task<List<AccountBalance>> Balances(int companyId, DateOnly? from, DateOnly to, int? accountId = null, bool excludeClosing = false)
         {
             var sums = await _db.JournalLines.AsNoTracking()
                 .Where(l => l.JournalEntry!.CompanyClientId == companyId && l.JournalEntry.Date <= to
-                            && (from == null || l.JournalEntry.Date >= from) && (accountId == null || l.AccountId == accountId))
+                            && (from == null || l.JournalEntry.Date >= from) && (accountId == null || l.AccountId == accountId)
+                            && (!excludeClosing || l.JournalEntry.Source != JournalSource.Closing))
                 .GroupBy(l => l.AccountId)
                 .Select(g => new { AccountId = g.Key, Debit = g.Sum(l => l.Debit), Credit = g.Sum(l => l.Credit) })
                 .ToListAsync();

@@ -56,6 +56,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             };
             _db.Accounts.Add(entity);
             await _db.SaveChangesAsync();
+            Audit.Log(_db, User, companyId, "AccountCreated", "Account", entity.Id, $"Cuenta creada: {entity.Code} {entity.Name}");
+            await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { companyId, id = entity.Id }, entity);
         }
 
@@ -83,6 +85,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             entity.TaxType = input.TaxType;
             entity.Description = input.Description;
             entity.IsArchived = input.IsArchived;
+            Audit.Log(_db, User, companyId, "AccountUpdated", "Account", entity.Id, $"Cuenta modificada: {entity.Code} {entity.Name}{(entity.IsArchived ? " (archivada)" : "")}");
             await _db.SaveChangesAsync();
             return entity;
         }
@@ -97,7 +100,10 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             if (await _db.JournalLines.AnyAsync(l => l.AccountId == id))
                 return Problem("La cuenta tiene movimientos contabilizados. Puedes archivarla en lugar de eliminarla.", statusCode: 409);
 
+            if (await _db.BankRules.AnyAsync(r => r.AccountId == id))
+                return Problem("Hay reglas bancarias que usan esta cuenta. Cámbialas o archiva la cuenta.", statusCode: 409);
             _db.Accounts.Remove(entity);
+            Audit.Log(_db, User, companyId, "AccountDeleted", "Account", id, $"Cuenta eliminada: {entity.Code} {entity.Name}");
             await _db.SaveChangesAsync();
             return NoContent();
         }
@@ -108,6 +114,11 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
         {
             if (!await CompanyExists(companyId)) return CompanyNotFound();
             var added = await AccountingService.LoadDefaultChartAsync(_db, companyId);
+            if (added > 0)
+            {
+                Audit.Log(_db, User, companyId, "ChartLoaded", "Account", null, $"Plan de cuentas estándar: {added} cuentas agregadas");
+                await _db.SaveChangesAsync();
+            }
             return new { added };
         }
 

@@ -121,6 +121,63 @@ namespace Accounting_Register_BE.Migrations
                     b.ToTable("ApiKeys");
                 });
 
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.AuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int?>("ApiKeyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CompanyClientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyClientId", "At");
+
+                    b.HasIndex("CompanyClientId", "EntityType", "EntityId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankAccount", b =>
                 {
                     b.Property<int>("Id")
@@ -168,6 +225,85 @@ namespace Accounting_Register_BE.Migrations
                     b.HasIndex("CompanyClientId");
 
                     b.ToTable("BankAccounts");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("AmountMax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("AmountMin")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("AutoReconcile")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("BankAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CompanyClientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LineDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MatchField")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("MatchText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("MatchType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TaxType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("BankAccountId");
+
+                    b.HasIndex("CompanyClientId");
+
+                    b.ToTable("BankRules");
                 });
 
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankStatement", b =>
@@ -282,6 +418,19 @@ namespace Accounting_Register_BE.Migrations
                     b.ToTable("BankTransactions");
                 });
 
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.CompanyAccountingSettings", b =>
+                {
+                    b.Property<int>("CompanyClientId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("LockDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("CompanyClientId");
+
+                    b.ToTable("AccountingSettings");
+                });
+
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.JournalEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -298,6 +447,10 @@ namespace Accounting_Register_BE.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("CreatedByUserId")
                         .HasMaxLength(450)
@@ -735,6 +888,16 @@ namespace Accounting_Register_BE.Migrations
                     b.Navigation("CompanyClient");
                 });
 
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.AuditLog", b =>
+                {
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithMany()
+                        .HasForeignKey("CompanyClientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CompanyClient");
+                });
+
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankAccount", b =>
                 {
                     b.HasOne("Accounting_Register_BE.Areas.Accounting.Model.Account", "Account")
@@ -750,6 +913,32 @@ namespace Accounting_Register_BE.Migrations
                         .IsRequired();
 
                     b.Navigation("Account");
+
+                    b.Navigation("CompanyClient");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankRule", b =>
+                {
+                    b.HasOne("Accounting_Register_BE.Areas.Accounting.Model.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Accounting_Register_BE.Areas.Accounting.Model.BankAccount", "BankAccount")
+                        .WithMany()
+                        .HasForeignKey("BankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithMany()
+                        .HasForeignKey("CompanyClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("BankAccount");
 
                     b.Navigation("CompanyClient");
                 });
@@ -789,6 +978,17 @@ namespace Accounting_Register_BE.Migrations
                     b.Navigation("BankStatement");
 
                     b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.CompanyAccountingSettings", b =>
+                {
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithOne()
+                        .HasForeignKey("Accounting_Register_BE.Areas.Accounting.Model.CompanyAccountingSettings", "CompanyClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CompanyClient");
                 });
 
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.JournalEntry", b =>

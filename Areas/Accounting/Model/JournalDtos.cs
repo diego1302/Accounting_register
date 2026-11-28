@@ -34,7 +34,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
 
     public record JournalEntryDetailDto(
         int Id, DateOnly Date, string? Reference, string Narration, JournalSource Source,
-        string? ExternalSource, string? ExternalId, DateTime CreatedAt,
+        string? ExternalSource, string? ExternalId, DateTime CreatedAt, string? CreatedBy,
         decimal TotalDebit, decimal TotalCredit, List<JournalLineDto> Lines);
 
     /// <summary>Status: "created" or "existing" (idempotent replay of an ExternalId already posted).</summary>

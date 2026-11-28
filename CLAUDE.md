@@ -34,7 +34,11 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 | `/api/countries` | CRUD; GET devuelve array, filtro `q`. |
 | `/api/companies/{companyId}/accounts` | Plan de cuentas (CRUD, `?includeArchived`), `POST load-default` carga el plan australiano estándar. |
 | `/api/companies/{companyId}/bank-accounts` | CRUD (crea su cuenta contable tipo `Bank`, código 090…); `POST {id}/statements/preview` y `POST {id}/statements` (multipart `file` + `mapping` JSON opcional); `GET/DELETE {id}/statements`; `GET {id}/transactions?status&q&page&limit`. |
-| `/api/companies/{companyId}/bank-transactions/{id}/reconcile` | `POST` contabiliza (genera asiento), `DELETE` deshace. |
+| `/api/companies/{companyId}/bank-transactions/{id}/...` | `POST reconcile` contabiliza; `POST transfer` (a otra cuenta bancaria propia, opcional `counterpartTransactionId` para conciliar ambos lados con un asiento); `POST match` (vincula a un asiento existente); `DELETE reconcile` deshace. `POST reconcile-bulk` (≤200, cada uno independiente). La lista de movimientos trae `suggestion` (regla o historial), `matchCandidates` y `transferCandidates`. |
+| `/api/companies/{companyId}/bank-rules` | CRUD de reglas ("contiene TELSTRA → 489 GST"); `autoReconcile` concilia sola al importar. `POST bank-accounts/{id}/apply-rules` las corre sobre pendientes. |
+| `/api/companies/{companyId}/closing` | GET estado (fecha de cierre + años fiscales); `PUT lock-date`; `POST fiscal-years/{endYear}/close` (asiento `Closing` al 30/jun hacia resultados acumulados 960 y cierra el período); `DELETE fiscal-years/{endYear}` reabre. |
+| `/api/companies/{companyId}/audit` | Bitácora (solo lectura) con filtros `from,to,action,entityType,entityId,q`. |
+| `/api/companies/{companyId}/dashboard` | Bancos, pendientes, resultado del mes y del anterior, fecha de cierre y actividad reciente. |
 | `/api/companies/{companyId}/reports/*` | `profit-and-loss?from&to`, `balance-sheet?asOf`, `trial-balance?asOf`, `general-ledger?from&to&accountId`. Montos con el signo natural de cada cuenta; año fiscal australiano (1 jul). Sin cierre de ejercicio: el balance muestra "Resultado del ejercicio" y "de ejercicios anteriores" calculados. |
 | `/api/companies/{companyId}/journal-entries` | Asientos: GET lista/detalle, `POST` (uno), `POST batch` (≤100, todo o nada), `DELETE` (no los de banco). Acepta token de usuario **o** header `X-Api-Key` (app externa). Idempotente con `externalSource`+`externalId`. Doc para terceros: `docs/journal-api.md`. |
 | `/api/companies/{companyId}/api-keys` | Claves de apps externas (solo usuarios): GET, `POST {name}` devuelve la clave una sola vez, `DELETE` revoca. |
@@ -57,4 +61,12 @@ el resto usa la política por defecto (solo usuarios). Una clave está atada a u
   con `SystemKey = "GST"` (se crea sola si falta). Duplicados de extractos: índice único `(BankAccountId, DedupeKey)`.
   Todas las FK de contabilidad son `Restrict` (SQL Server no admite rutas de cascada múltiples): los borrados se hacen
   explícitos en los controladores, y una empresa con contabilidad no se puede eliminar.
+- **Auditoría**: `Audit.Log(...)` agrega la fila al contexto; se guarda en el mismo `SaveChanges` que el cambio. Registrar toda
+  acción nueva que modifique la contabilidad. `JournalEntry.CreatedBy` = email, "API: clave" o "Regla: nombre".
+- **Período cerrado**: `AccountingService.EnsureOpenAsync(db, companyId, fechas…)` antes de crear/borrar asientos o
+  conciliar/deshacer movimientos (incluida la API externa). Un asiento puede estar vinculado a **dos** movimientos (transferencia):
+  deshacer uno solo lo desvincula; el asiento de banco se borra cuando no queda ninguno vinculado. Asientos `Manual`/`External`
+  vinculados por "match" nunca se borran al deshacer.
+- **Cierre de año**: el asiento `Closing` se excluye del estado de resultados y del panel (no de balance/mayor). No se borra como
+  asiento: se reabre el año.
 - Los controladores se ubican por atributo `[Route("api/...")]`, no por convención de Areas.

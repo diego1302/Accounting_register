@@ -29,17 +29,72 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         decimal StatementBalance, DateOnly? StatementBalanceDate, decimal LedgerBalance,
         int UnreconciledCount, DateTime? LastImportAt);
 
-    public record ImportResultDto(int? StatementId, int Imported, int Duplicates, DateOnly? FromDate, DateOnly? ToDate, List<Services.ParseError> Errors);
+    public record ImportResultDto(int? StatementId, int Imported, int Duplicates, DateOnly? FromDate, DateOnly? ToDate, List<Services.ParseError> Errors, int AutoReconciled = 0);
 
     public record JournalLineDto(int AccountId, string AccountCode, string AccountName, string? Description, decimal Debit, decimal Credit, TaxType? TaxType);
 
-    public record JournalEntryDto(int Id, DateOnly Date, string? Reference, string Narration, JournalSource Source, List<JournalLineDto> Lines);
+    public record JournalEntryDto(int Id, DateOnly Date, string? Reference, string Narration, JournalSource Source, List<JournalLineDto> Lines, string? CreatedBy = null);
 
-    public record SuggestionDto(int AccountId, TaxType TaxType);
+    /// <summary>Proposed coding: from a bank rule (RuleId set) or from the last identical reconciled line.</summary>
+    public record SuggestionDto(int AccountId, TaxType TaxType, int? RuleId = null, string? RuleName = null, string? Description = null);
+
+    /// <summary>An existing journal (manual, external or the other side of a transfer) that already records this bank line.</summary>
+    public record MatchCandidateDto(int JournalEntryId, DateOnly Date, string Narration, string? Reference, JournalSource Source);
+
+    /// <summary>A pending line in another bank account of the company with the opposite amount (likely the other side of a transfer).</summary>
+    public record TransferCandidateDto(int TransactionId, int BankAccountId, string BankAccountName, DateOnly Date, string Description, decimal Amount);
 
     public record BankTransactionDto(
         int Id, int BankAccountId, int BankStatementId, DateOnly Date, string Description, string? Reference,
-        decimal Amount, decimal? Balance, BankTransactionStatus Status, JournalEntryDto? JournalEntry, SuggestionDto? Suggestion);
+        decimal Amount, decimal? Balance, BankTransactionStatus Status, JournalEntryDto? JournalEntry, SuggestionDto? Suggestion,
+        List<MatchCandidateDto> MatchCandidates, List<TransferCandidateDto> TransferCandidates);
+
+    public class TransferInput
+    {
+        /// <summary>The other bank account of the company the money went to / came from.</summary>
+        public int ToBankAccountId { get; set; }
+        /// <summary>The matching line in the other account's statement, if already imported: both get reconciled with one journal.</summary>
+        public int? CounterpartTransactionId { get; set; }
+        [MaxLength(500)] public string? Narration { get; set; }
+    }
+
+    public class MatchInput
+    {
+        public int JournalEntryId { get; set; }
+    }
+
+    public class BulkReconcileItem
+    {
+        public int TransactionId { get; set; }
+        public int AccountId { get; set; }
+        public TaxType TaxType { get; set; }
+        [MaxLength(500)] public string? Description { get; set; }
+    }
+
+    public class BulkReconcileInput
+    {
+        [Required] public List<BulkReconcileItem> Items { get; set; } = new();
+    }
+
+    public record BulkReconcileResult(int TransactionId, bool Ok, string? Error);
+
+    public class BankRuleInput
+    {
+        public int? BankAccountId { get; set; }
+        [Required, MaxLength(100)] public string Name { get; set; } = string.Empty;
+        public int Priority { get; set; }
+        public RuleMatchField MatchField { get; set; }
+        public RuleMatchType MatchType { get; set; }
+        [Required, MaxLength(200)] public string MatchText { get; set; } = string.Empty;
+        public RuleDirection Direction { get; set; }
+        public decimal? AmountMin { get; set; }
+        public decimal? AmountMax { get; set; }
+        public int AccountId { get; set; }
+        public TaxType TaxType { get; set; }
+        [MaxLength(500)] public string? LineDescription { get; set; }
+        public bool AutoReconcile { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
 
     public class ReconcileLineInput
     {

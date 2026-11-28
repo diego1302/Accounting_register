@@ -46,7 +46,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Services
             ("826", "Superannuation por pagar", AccountType.CurrentLiability, TaxType.BASExcluded, null),
             ("880", "Retiros del dueño", AccountType.Equity, TaxType.BASExcluded, null),
             ("881", "Aportes del dueño", AccountType.Equity, TaxType.BASExcluded, null),
-            ("960", "Resultados acumulados", AccountType.Equity, TaxType.BASExcluded, null),
+            ("960", "Resultados acumulados", AccountType.Equity, TaxType.BASExcluded, AccountingService.RetainedEarningsKey),
             ("970", "Capital", AccountType.Equity, TaxType.BASExcluded, null),
         };
     }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Accounting_Register_BE.Areas.Accounting.Model;
 using Accounting_Register_BE.Areas.Accounting.Security;
+using Accounting_Register_BE.Areas.Accounting.Services;
 using Accounting_Register_BE.DataBase;
 
 using Microsoft.AspNetCore.Authorization;
@@ -45,6 +46,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             };
             _db.ApiKeys.Add(key);
             await _db.SaveChangesAsync();
+            Audit.Log(_db, User, companyId, "ApiKeyCreated", "ApiKey", key.Id, $"Clave API creada: {key.Name} ({key.Prefix}…)");
+            await _db.SaveChangesAsync();
             return new ApiKeyCreatedDto(key.Id, key.Name, key.Prefix, key.CreatedAt, plain);
         }
 
@@ -54,7 +57,11 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
         {
             var key = await _db.ApiKeys.FirstOrDefaultAsync(k => k.CompanyClientId == companyId && k.Id == id);
             if (key is null) return NotFound();
-            key.RevokedAt ??= DateTime.UtcNow;
+            if (key.RevokedAt is null)
+            {
+                key.RevokedAt = DateTime.UtcNow;
+                Audit.Log(_db, User, companyId, "ApiKeyRevoked", "ApiKey", key.Id, $"Clave API revocada: {key.Name} ({key.Prefix}…)");
+            }
             await _db.SaveChangesAsync();
             return NoContent();
         }

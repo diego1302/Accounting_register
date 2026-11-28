@@ -78,6 +78,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             };
             _db.BankAccounts.Add(bank);
             await _db.SaveChangesAsync();
+            Audit.Log(_db, User, companyId, "BankAccountCreated", "BankAccount", bank.Id, $"Cuenta bancaria creada: {bank.Name} (cuenta contable {code})");
+            await _db.SaveChangesAsync();
             await trx.CommitAsync();
 
             return CreatedAtAction(nameof(Get), new { companyId, id = bank.Id }, await ToDto(companyId, bank.Id));
@@ -112,8 +114,11 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             await _db.BankTransactions.Where(t => t.BankAccountId == id).ExecuteDeleteAsync();
             await _db.BankStatements.Where(s => s.BankAccountId == id).ExecuteDeleteAsync();
             var accountId = bank.AccountId;
+            await _db.BankRules.Where(r => r.BankAccountId == id).ExecuteDeleteAsync();
             await _db.BankAccounts.Where(b => b.Id == id).ExecuteDeleteAsync();
             await _db.Accounts.Where(a => a.Id == accountId).ExecuteDeleteAsync();
+            Audit.Log(_db, User, companyId, "BankAccountDeleted", "BankAccount", id, $"Cuenta bancaria eliminada: {bank.Name}");
+            await _db.SaveChangesAsync();
             await trx.CommitAsync();
             return NoContent();
         }
@@ -228,10 +233,25 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
                 ExternalId = p.First.ExternalId,
                 DedupeKey = p.Second,
             }));
+            Audit.Log(_db, User, companyId, "StatementImported", "BankStatement", statement.Id,
+                $"Extracto {statement.FileName} en {bank.Name}: {fresh.Count} movimientos nuevos, {duplicates} omitidos");
             await _db.SaveChangesAsync();
             await trx.CommitAsync();
 
-            return new ImportResultDto(statement.Id, fresh.Count, duplicates, statement.FromDate, statement.ToDate, errors);
+            // Rules marked "reconcile automatically" run on the new lines right away.
+            var newIds = await _db.BankTransactions.Where(t => t.BankStatementId == statement.Id).Select(t => t.Id).ToListAsync();
+            var auto = await ReconciliationService.AutoReconcileAsync(_db, companyId, id, newIds, User);
+
+            return new ImportResultDto(statement.Id, fresh.Count, duplicates, statement.FromDate, statement.ToDate, errors, auto);
+        }
+
+        /// <summary>Runs the auto-reconcile rules over every pending line of the account.</summary>
+        [HttpPost("{id:int}/apply-rules")]
+        public async Task<ActionResult<object>> ApplyRules(int companyId, int id)
+        {
+            if (!await _db.BankAccounts.AnyAsync(b => b.CompanyClientId == companyId && b.Id == id)) return NotFound();
+            var reconciled = await ReconciliationService.AutoReconcileAsync(_db, companyId, id, null, User);
+            return new { reconciled };
         }
 
         [HttpGet("{id:int}/statements")]
@@ -253,6 +273,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             using var trx = await _db.Database.BeginTransactionAsync();
             await _db.BankTransactions.Where(t => t.BankStatementId == statementId).ExecuteDeleteAsync();
             await _db.BankStatements.Where(s => s.Id == statementId).ExecuteDeleteAsync();
+            Audit.Log(_db, User, companyId, "StatementDeleted", "BankStatement", statementId, $"Extracto eliminado: {statement.FileName} ({statement.ImportedCount} movimientos)");
+            await _db.SaveChangesAsync();
             await trx.CommitAsync();
             return NoContent();
         }
@@ -286,7 +308,10 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
 
         // ------------------------------------------------------------ helpers
 
-        private async Task<BankAccountDto?> ToDto(int companyId, int id)
+        private Task<BankAccountDto?> ToDto(int companyId, int id) => ToDtoAsync(_db, companyId, id);
+
+        /// <summary>Bank account with statement balance, ledger balance and pending count (also used by the dashboard).</summary>
+        internal static async Task<BankAccountDto?> ToDtoAsync(ApplicationDBContext _db, int companyId, int id)
         {
             var b = await _db.BankAccounts.AsNoTracking().Include(x => x.Account).FirstOrDefaultAsync(x => x.CompanyClientId == companyId && x.Id == id);
             if (b is null) return null;

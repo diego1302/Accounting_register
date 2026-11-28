@@ -14,16 +14,49 @@ namespace Accounting_Register_BE.Areas.Accounting.Services
 
     public static class AccountingService
     {
+        public const string RetainedEarningsKey = "RETAINED_EARNINGS";
+
+        public static async Task<DateOnly?> LockDateAsync(ApplicationDBContext db, int companyId) =>
+            await db.AccountingSettings.Where(s => s.CompanyClientId == companyId).Select(s => s.LockDate).FirstOrDefaultAsync();
+
+        /// <summary>Throws 409 if any of the dates falls in a locked (closed) period.</summary>
+        public static async Task EnsureOpenAsync(ApplicationDBContext db, int companyId, params DateOnly[] dates)
+        {
+            var lockDate = await LockDateAsync(db, companyId);
+            if (lockDate is null) return;
+            var closed = dates.Where(d => d <= lockDate).OrderBy(d => d).ToList();
+            if (closed.Count > 0)
+                throw new AccountingException($"El período está cerrado hasta el {lockDate:dd/MM/yyyy} (fecha {closed[0]:dd/MM/yyyy}). Ábrelo en Configuración → Cierre contable.", StatusCodes.Status409Conflict);
+        }
+
+        /// <summary>Equity account the year-end closing posts to (code 960 in the standard chart); created if missing.</summary>
+        public static async Task<Account> EnsureRetainedEarningsAsync(ApplicationDBContext db, int companyId)
+        {
+            var acc = await db.Accounts.FirstOrDefaultAsync(a => a.CompanyClientId == companyId && a.SystemKey == RetainedEarningsKey)
+                      ?? await db.Accounts.FirstOrDefaultAsync(a => a.CompanyClientId == companyId && a.Code == "960" && a.Type == AccountType.Equity && a.SystemKey == null);
+            if (acc != null)
+            {
+                acc.SystemKey ??= RetainedEarningsKey;
+                return acc;
+            }
+            var codes = await db.Accounts.Where(a => a.CompanyClientId == companyId).Select(a => a.Code).ToListAsync();
+            var code = "960";
+            for (var n = 960; codes.Contains(code); n++) code = n.ToString();
+            acc = new Account { CompanyClientId = companyId, Code = code, Name = "Resultados acumulados", Type = AccountType.Equity, TaxType = TaxType.BASExcluded, SystemKey = RetainedEarningsKey };
+            db.Accounts.Add(acc);
+            return acc;
+        }
+
         /// <summary>Adds the default chart accounts whose code the company does not use yet. Returns how many were added.</summary>
         public static async Task<int> LoadDefaultChartAsync(ApplicationDBContext db, int companyId)
         {
             var existing = await db.Accounts.Where(a => a.CompanyClientId == companyId).Select(a => a.Code).ToListAsync();
-            var hasGst = await db.Accounts.AnyAsync(a => a.CompanyClientId == companyId && a.SystemKey == DefaultChartOfAccounts.GstSystemKey);
+            var keys = await db.Accounts.Where(a => a.CompanyClientId == companyId && a.SystemKey != null).Select(a => a.SystemKey).ToListAsync();
             var added = 0;
             foreach (var (code, name, type, tax, key) in DefaultChartOfAccounts.Accounts)
             {
                 if (existing.Contains(code)) continue;
-                if (key != null && hasGst) continue;
+                if (key != null && keys.Contains(key)) continue;
                 db.Accounts.Add(new Account { CompanyClientId = companyId, Code = code, Name = name, Type = type, TaxType = tax, SystemKey = key });
                 added++;
             }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Accounting_Register_BE.Areas.Accounting.Model;
 using Accounting_Register_BE.Areas.Accounting.Security;
+using Accounting_Register_BE.Areas.Accounting.Services;
 using Accounting_Register_BE.DataBase;
 using Accounting_Register_BE.Resources.Model;
 
@@ -79,11 +80,14 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
 
             var existing = await FindExisting(companyId, input);
             if (existing != null) return Ok(ToDto(existing));
+            if (await LockedProblem(companyId, input.Date) is { } locked) return locked;
 
             var entry = Build(companyId, input, accounts);
             _db.JournalEntries.Add(entry);
             try
             {
+                await _db.SaveChangesAsync();
+                Audit.Log(_db, User, companyId, "JournalCreated", "JournalEntry", entry.Id, $"Asiento #{entry.Id} registrado: {entry.Narration} ({entry.Lines.Sum(l => l.Debit):0.00})");
                 await _db.SaveChangesAsync();
             }
             catch (DbUpdateException) when (input.ExternalId != null)
@@ -115,6 +119,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
                 .GroupBy(x => (Source(x.e), x.e.ExternalId)).Where(g => g.Count() > 1);
             foreach (var g in dupes) errors[$"entries[{g.Last().i}].externalId"] = new[] { $"ExternalId \"{g.Key.ExternalId}\" repetido en el lote." };
             if (errors.Count > 0) return ValidationProblem(new ValidationProblemDetails(errors) { Title = "El lote no es válido; no se guardó ningún asiento." });
+            if (await LockedProblem(companyId, input.Entries.Select(e => e.Date).ToArray()) is { } locked) return locked;
 
             var results = new List<(int Index, string Status, JournalEntry Entry)>();
             using var trx = await _db.Database.BeginTransactionAsync();
@@ -128,6 +133,9 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
             }
             try
             {
+                await _db.SaveChangesAsync();
+                foreach (var r in results.Where(r => r.Status == "created"))
+                    Audit.Log(_db, User, companyId, "JournalCreated", "JournalEntry", r.Entry.Id, $"Asiento #{r.Entry.Id} registrado (lote): {r.Entry.Narration} ({r.Entry.Lines.Sum(l => l.Debit):0.00})");
                 await _db.SaveChangesAsync();
                 await trx.CommitAsync();
             }
@@ -148,19 +156,29 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
         public async Task<IActionResult> Delete(int companyId, int id)
         {
             if (Denied(companyId) is { } denied) return denied;
-            var entry = await _db.JournalEntries.FirstOrDefaultAsync(e => e.CompanyClientId == companyId && e.Id == id);
+            var entry = await _db.JournalEntries.Include(e => e.Lines).ThenInclude(l => l.Account).FirstOrDefaultAsync(e => e.CompanyClientId == companyId && e.Id == id);
             if (entry is null) return NotFound();
+            if (entry.Source == JournalSource.Closing) return Problem("Es un asiento de cierre de año; se deshace reabriendo el año en Cierre contable.", statusCode: 409);
             if (entry.Source == JournalSource.Bank || await _db.BankTransactions.AnyAsync(t => t.JournalEntryId == id))
                 return Problem("Este asiento viene de una conciliación bancaria; deshazlo desde Bancos.", statusCode: 409);
             if (User.ApiKeyId() != null && entry.Source != JournalSource.External)
                 return Problem("Una API key solo puede eliminar asientos externos.", statusCode: 403);
 
+            if (await LockedProblem(companyId, entry.Date) is { } locked) return locked;
+
+            Audit.Log(_db, User, companyId, "JournalDeleted", "JournalEntry", entry.Id, $"Asiento #{entry.Id} eliminado: {entry.Narration} ({entry.Lines.Sum(l => l.Debit):0.00})", Audit.Snapshot(entry));
             _db.JournalEntries.Remove(entry); // lines cascade
             await _db.SaveChangesAsync();
             return NoContent();
         }
 
         // ------------------------------------------------------------ helpers
+
+        private async Task<ObjectResult?> LockedProblem(int companyId, params DateOnly[] dates)
+        {
+            try { await AccountingService.EnsureOpenAsync(_db, companyId, dates); return null; }
+            catch (AccountingException ex) { return Problem(ex.Message, statusCode: ex.StatusCode); }
+        }
 
         /// <summary>An API key only reaches its own company.</summary>
         private ObjectResult? Denied(int companyId)
@@ -250,6 +268,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
                 Source = viaKey != null ? JournalSource.External : JournalSource.Manual,
                 CreatedAt = DateTime.UtcNow,
                 CreatedByUserId = viaKey == null ? User.FindFirstValue(ClaimTypes.NameIdentifier) : null,
+                CreatedBy = Audit.ActorName(User),
                 ApiKeyId = viaKey,
                 ExternalSource = string.IsNullOrWhiteSpace(input.ExternalId) && string.IsNullOrWhiteSpace(input.ExternalSource) && viaKey == null ? null : Source(input),
                 ExternalId = string.IsNullOrWhiteSpace(input.ExternalId) ? null : input.ExternalId.Trim(),
@@ -265,7 +284,7 @@ namespace Accounting_Register_BE.Areas.Accounting.Controller
         }
 
         public static JournalEntryDetailDto ToDto(JournalEntry e) => new(
-            e.Id, e.Date, e.Reference, e.Narration, e.Source, e.ExternalSource, e.ExternalId, e.CreatedAt,
+            e.Id, e.Date, e.Reference, e.Narration, e.Source, e.ExternalSource, e.ExternalId, e.CreatedAt, e.CreatedBy,
             e.Lines.Sum(l => l.Debit), e.Lines.Sum(l => l.Credit),
             e.Lines.OrderBy(l => l.Id).Select(l => new JournalLineDto(l.AccountId, l.Account!.Code, l.Account.Name, l.Description, l.Debit, l.Credit, l.TaxType)).ToList());
     }
