@@ -72,6 +72,55 @@ namespace Accounting_Register_BE.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.ApiKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CompanyClientId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyClientId");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique();
+
+                    b.ToTable("ApiKeys");
+                });
+
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.BankAccount", b =>
                 {
                     b.Property<int>("Id")
@@ -241,6 +290,9 @@ namespace Accounting_Register_BE.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ApiKeyId")
+                        .HasColumnType("int");
+
                     b.Property<int>("CompanyClientId")
                         .HasColumnType("int");
 
@@ -253,6 +305,14 @@ namespace Accounting_Register_BE.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ExternalSource")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Narration")
                         .IsRequired()
@@ -271,6 +331,10 @@ namespace Accounting_Register_BE.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyClientId", "Date");
+
+                    b.HasIndex("CompanyClientId", "ExternalSource", "ExternalId")
+                        .IsUnique()
+                        .HasFilter("[ExternalId] IS NOT NULL");
 
                     b.ToTable("JournalEntries");
                 });
@@ -650,6 +714,17 @@ namespace Accounting_Register_BE.Migrations
                 });
 
             modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.Account", b =>
+                {
+                    b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
+                        .WithMany()
+                        .HasForeignKey("CompanyClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CompanyClient");
+                });
+
+            modelBuilder.Entity("Accounting_Register_BE.Areas.Accounting.Model.ApiKey", b =>
                 {
                     b.HasOne("Accounting_Register_BE.Areas.Config.Users.Model.CompanyClient", "CompanyClient")
                         .WithMany()

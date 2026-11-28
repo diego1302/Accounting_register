@@ -20,7 +20,7 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 - `Areas/Config/Security_Issuer/` — modelo y controlador de emisores.
 - `Areas/Config/Users/` — `ApplicationUser`, `CompanyClient`, controladores de clientes y perfil.
 - `Areas/Accounting/` — contabilidad por empresa cliente: `Model/` (entidades + DTOs), `Services/` (`StatementParser` CSV/OFX,
-  `AccountingService` asientos y GST, `DefaultChartOfAccounts`), `Controller/` (cuentas, bancos/extractos, conciliación).
+  `AccountingService` asientos y GST, `DefaultChartOfAccounts`), `Controller/` (cuentas, bancos/extractos, conciliación, asientos, reportes, API keys), `Security/` (esquema `ApiKey`).
 - `Resources/` — modelos compartidos (`Addreses`, `Countries`, `PaginationModel`, `PagedResult`) y `CountriesController`.
 - `Migrations/` — migraciones EF (no editar a mano las ya aplicadas).
 
@@ -36,7 +36,11 @@ No hay tests automatizados; para probar a mano usar `Accounting_Register_BE.http
 | `/api/companies/{companyId}/bank-accounts` | CRUD (crea su cuenta contable tipo `Bank`, código 090…); `POST {id}/statements/preview` y `POST {id}/statements` (multipart `file` + `mapping` JSON opcional); `GET/DELETE {id}/statements`; `GET {id}/transactions?status&q&page&limit`. |
 | `/api/companies/{companyId}/bank-transactions/{id}/reconcile` | `POST` contabiliza (genera asiento), `DELETE` deshace. |
 | `/api/companies/{companyId}/reports/*` | `profit-and-loss?from&to`, `balance-sheet?asOf`, `trial-balance?asOf`, `general-ledger?from&to&accountId`. Montos con el signo natural de cada cuenta; año fiscal australiano (1 jul). Sin cierre de ejercicio: el balance muestra "Resultado del ejercicio" y "de ejercicios anteriores" calculados. |
-Todos excepto `/api/auth/*` llevan `[Authorize]`.
+| `/api/companies/{companyId}/journal-entries` | Asientos: GET lista/detalle, `POST` (uno), `POST batch` (≤100, todo o nada), `DELETE` (no los de banco). Acepta token de usuario **o** header `X-Api-Key` (app externa). Idempotente con `externalSource`+`externalId`. Doc para terceros: `docs/journal-api.md`. |
+| `/api/companies/{companyId}/api-keys` | Claves de apps externas (solo usuarios): GET, `POST {name}` devuelve la clave una sola vez, `DELETE` revoca. |
+Todos excepto `/api/auth/*` llevan `[Authorize]`. Las API keys solo autentican en `/journal-entries` (política `JournalApi`);
+el resto usa la política por defecto (solo usuarios). Una clave está atada a una empresa: el controlador compara su claim
+`company_id` con la ruta.
 
 ## Convenciones y trampas
 - `Nullable` está activado: un `string` no anulable se vuelve **obligatorio** en el model binding y `NOT NULL` en BD.

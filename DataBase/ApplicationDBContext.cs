@@ -33,6 +33,7 @@ namespace Accounting_Register_BE.DataBase
         public DbSet<BankTransaction> BankTransactions { get; set; }
         public DbSet<JournalEntry> JournalEntries { get; set; }
         public DbSet<JournalLine> JournalLines { get; set; }
+        public DbSet<ApiKey> ApiKeys { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -97,6 +98,14 @@ namespace Accounting_Register_BE.DataBase
                 e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
                 e.HasIndex(x => new { x.CompanyClientId, x.Date });
                 e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+                // Idempotency for external apps: the same (source, id) can only be posted once per company.
+                e.HasIndex(x => new { x.CompanyClientId, x.ExternalSource, x.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
+            });
+
+            builder.Entity<ApiKey>(e =>
+            {
+                e.HasOne(x => x.CompanyClient).WithMany().HasForeignKey(x => x.CompanyClientId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.KeyHash).IsUnique();
             });
 
             builder.Entity<JournalLine>(e =>

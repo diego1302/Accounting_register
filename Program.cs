@@ -1,3 +1,5 @@
+using Accounting_Register_BE.Areas.Accounting.Controller;
+using Accounting_Register_BE.Areas.Accounting.Security;
 using Accounting_Register_BE.Areas.Users.Model;
 using Accounting_Register_BE.DataBase;
 
@@ -15,11 +17,21 @@ builder.Services.AddDbContext<ApplicationDBContext>(options => options.UseSqlSer
 
 #region authorization - Authentication services
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Journal entries accept a signed-in user (Identity bearer) or an external app (X-Api-Key, scoped to one company).
+    // Every other endpoint keeps the default policy: users only.
+    options.AddPolicy(JournalEntriesController.Policy, p => p
+        .AddAuthenticationSchemes(IdentityConstants.BearerScheme, ApiKeyAuthenticationHandler.SchemeName)
+        .RequireAuthenticatedUser());
+});
 
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDBContext>();
+
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, null);
 #endregion
 
 #region Section to add Interfaces 
@@ -63,6 +75,14 @@ builder.Services.AddCors(options =>
             Type = SecuritySchemeType.Http,
             BearerFormat = "JWT",
             Scheme = "bearer"
+        });
+
+        options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme()
+        {
+            In = ParameterLocation.Header,
+            Description = "API key de una app externa (solo /journal-entries de su empresa)",
+            Name = ApiKeyAuthenticationHandler.HeaderName,
+            Type = SecuritySchemeType.ApiKey,
         });
 
         options.AddSecurityRequirement(new OpenApiSecurityRequirement()

@@ -39,6 +39,8 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
     {
         Bank,
         Manual,
+        /// <summary>Posted by an external application through the API (API key).</summary>
+        External,
     }
 
     /// <summary>Chart of accounts entry. Each company client has its own chart.</summary>
@@ -135,6 +137,13 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         public DateTime CreatedAt { get; set; }
         [MaxLength(450)] public string? CreatedByUserId { get; set; }
 
+        /// <summary>System that sent the entry (e.g. "pos", "payroll"). With <see cref="ExternalId"/> it makes posting idempotent.</summary>
+        [MaxLength(50)] public string? ExternalSource { get; set; }
+        /// <summary>The sender's own id for this entry; unique per company + <see cref="ExternalSource"/>.</summary>
+        [MaxLength(100)] public string? ExternalId { get; set; }
+        /// <summary>API key that posted it, when it came from an external app.</summary>
+        public int? ApiKeyId { get; set; }
+
         public List<JournalLine> Lines { get; set; } = new();
     }
 
@@ -152,5 +161,25 @@ namespace Accounting_Register_BE.Areas.Accounting.Model
         public decimal Credit { get; set; }
         /// <summary>Tax treatment chosen for this line (informational, the GST itself is its own line).</summary>
         public TaxType? TaxType { get; set; }
+    }
+
+    /// <summary>
+    /// Credential for an external application, scoped to one company client. Only the SHA-256 of the key is stored;
+    /// the plain key is shown once when it is created.
+    /// </summary>
+    public class ApiKey
+    {
+        [Key] public int Id { get; set; }
+        public int CompanyClientId { get; set; }
+        [JsonIgnore] public CompanyClient? CompanyClient { get; set; }
+
+        [Required, MaxLength(100)] public string Name { get; set; } = string.Empty;
+        /// <summary>First characters of the key, to recognise it in the list (e.g. "ar_k3J9x2").</summary>
+        [Required, MaxLength(16)] public string Prefix { get; set; } = string.Empty;
+        [JsonIgnore, Required, MaxLength(64)] public string KeyHash { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        [JsonIgnore, MaxLength(450)] public string? CreatedByUserId { get; set; }
+        public DateTime? LastUsedAt { get; set; }
+        public DateTime? RevokedAt { get; set; }
     }
 }

@@ -96,3 +96,28 @@ Authorization: Bearer {{token}}
 ### accountId optional (all accounts with activity)
 GET {{host}}/api/companies/{{company}}/reports/general-ledger?from=2026-11-01&to=2026-11-30&accountId=25
 Authorization: Bearer {{token}}
+
+### ---------------- External journal API (X-Api-Key; create the key in the app: Configuración → Integraciones) ----------------
+@apikey = ar_paste-key-here
+
+POST {{host}}/api/companies/{{company}}/journal-entries
+X-Api-Key: {{apikey}}
+Content-Type: application/json
+
+{ "date": "2026-11-27", "reference": "Z-1001", "narration": "Ventas POS del día", "externalId": "z-1001",
+  "lines": [ { "accountCode": "610", "debit": 1100 }, { "accountCode": "200", "credit": 1000 }, { "accountCode": "820", "credit": 100 } ] }
+
+### Batch (all or nothing)
+POST {{host}}/api/companies/{{company}}/journal-entries/batch
+X-Api-Key: {{apikey}}
+Content-Type: application/json
+
+{ "entries": [ { "date": "2026-11-28", "narration": "Ventas POS 28/11", "externalId": "z-1002",
+  "lines": [ { "accountCode": "610", "debit": 550 }, { "accountCode": "200", "credit": 500 }, { "accountCode": "820", "credit": 50 } ] } ] }
+
+### API keys (user token)
+POST {{host}}/api/companies/{{company}}/api-keys
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "POS tienda" }
